@@ -1,0 +1,9 @@
+{
+    "AWSEBDockerrunVersion": "1",
+    "Image": {
+        "Name": "osherdp/gib-el-docker:latest"
+    },
+    "Ports": [
+        {"ContainerPort": "8000"}
+    ]
+}

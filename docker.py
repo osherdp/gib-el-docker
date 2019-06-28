@@ -73,6 +73,10 @@ class ImageLayer(object):
     def tar_path(self):
         return f"{self.layer_dir}/layer.tar"
 
+    @cached_property
+    def relative_tar_path(self):
+        return f"{self.fake_layerid}/layer.tar"
+
     def write(self):
         with open(f"{self.layer_dir}/VERSION", 'w') as version_file:
             version_file.write('1.0')
@@ -141,7 +145,7 @@ class DockerImage(object):
 
     @property
     def layers_paths(self):
-        return [layer.tar_path for layer in self.layers]
+        return [layer.relative_tar_path for layer in self.layers]
 
     @property
     def last_layer(self):

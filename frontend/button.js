@@ -62,9 +62,6 @@ export const DownloadButton = (props) => {
             link.click();
         });
     });
-    const buttonClassname = clsx({
-        [classes.buttonSuccess]: success,
-    });
     React.useEffect(() => {
         return () => {
         };
@@ -89,7 +86,6 @@ export const DownloadButton = (props) => {
                 <Button
                     variant="contained"
                     color="primary"
-                    className={buttonClassname}
                     disabled={loading || disabled}
                     onClick={handleButtonClick}
                 >

@@ -4,7 +4,7 @@ import io from 'socket.io-client';
 import {DownloadButton} from "./button";
 import TextField from "@material-ui/core/TextField";
 
-
+import logo from "./logo.png";
 import "./style.scss";
 
 class App extends React.Component {
@@ -65,6 +65,9 @@ class App extends React.Component {
     render() {
         return (
             <div className="container">
+                <div className="logo">
+                    <img src={logo}/>
+                </div>
                 <TextField
                     id="outlined-name"
                     label="Image Name"

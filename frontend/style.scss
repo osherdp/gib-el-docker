@@ -16,6 +16,14 @@ html, body, #root {
     flex-direction: column;
     width: 400px;
 
+    .logo {
+      width: 100%;
+
+      img {
+        width: 100%;
+      }
+    }
+
     .input_field {
 
     }

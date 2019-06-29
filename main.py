@@ -102,8 +102,6 @@ def fetch(room_id, path):
             emit('pull_progress', {"index": layer_index, "total": total},
                  namespace="/", room=room_id)
 
-        emit('pull_progress', {"index": total, "total": total},
-             namespace="/", room=room_id)
         print("pull done!")
         emit('pull_done', {"data": "pull_done!", "tar_path": tar_path},
              namespace="/", room=room_id)

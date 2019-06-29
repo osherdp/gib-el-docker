@@ -56,7 +56,7 @@ class ImageLayer(object):
 
         return layer_dir
 
-    @cached_property
+    @property
     def blob(self):
         print(f"Pulling blob: {self.hash}...", end="")
         sys.stdout.flush()
@@ -203,7 +203,7 @@ class DockerImage(object):
 
     @cached_property
     def tar_path(self):
-        return "downloads/" + self.repo + '_' + self.image_name + ":" + self.tag + '.tar.gz'
+        return "downloads/" + self.repo + '_' + self.image_name + ":" + self.tag + '.tar'
 
     def pull(self):
         print('Creating image structure in: ' + self.imgdir)
@@ -231,7 +231,7 @@ class DockerImage(object):
 
         # Create image tar and clean tmp folder
         docker_tar = self.tar_path
-        tar = tarfile.open(docker_tar, "w:gz")
+        tar = tarfile.open(docker_tar, "w")
         tar.add(self.imgdir, arcname=os.path.sep)
         tar.close()
 
@@ -244,6 +244,8 @@ class DockerImage(object):
             print(f"Layer {index + 1}/{total} - ", end="")
             yield index, total
             layer.write()
+
+        yield total, total
 
 
 if __name__ == '__main__':

@@ -1,4 +1,10 @@
+import re
+
 from gevent import monkey
+
+IMAGE_TAG_REGEX = \
+    r"(?:(?P<repository>[\w\d\-_\.]+)/)?" \
+    r"(?P<image>[\w\d\-_\.]+)(?:\:(?P<tag>.+))?"
 
 monkey.patch_all()
 
@@ -46,14 +52,46 @@ def on_leave(data):
     emit("event", ' has left the room.', room=room)
 
 
-@application.route("/api/exists/<repository>/<image>:<tag>")
-def image_exists(repository, image, tag):
-    return json.dumps({"exists": DockerImage(image=f"{image}:{tag}", repo=repository).exists()})
+@application.route("/api/exists/", defaults={"path": ""})
+@application.route("/api/exists/<path:path>")
+def image_exists(path):
+    match = re.match(IMAGE_TAG_REGEX, path)
+    if not match:
+        return json.dumps({
+            "exists": False
+        })
+
+    groups = match.groupdict()
+    image = groups["image"]
+    tag = groups["tag"] \
+        if groups["tag"] is not None else "latest"
+    repository = groups["repository"] \
+        if groups["repository"] is not None else "library"
+    return json.dumps({"exists": DockerImage(image=f"{image}:{tag}",
+                                             repo=repository).exists()})
 
 
-@application.route("/api/pull/<room_id>/<repository>/<image>:<tag>")
-def fetch(room_id, repository, image, tag):
+@application.route("/api/pull/<room_id>/<path:path>")
+def fetch(room_id, path):
     # file_path = "{repo}_{image}.tar".format(repo=repository, image=image)
+    match = re.match(IMAGE_TAG_REGEX, path)
+    if not match:
+        return application.response_class(
+            response={
+                "status_code": 401,
+                "message": "invalid image supplied"
+            },
+            status=401,
+            mimetype='application/json'
+        )
+
+    groups = match.groupdict()
+    image = groups["image"]
+    tag = groups["tag"] \
+        if groups["tag"] is not None else "latest"
+    repository = groups["repository"] \
+        if groups["repository"] is not None else "library"
+
     @copy_current_request_context
     def download_docker_image(repo, image):
         print("downloading file!")

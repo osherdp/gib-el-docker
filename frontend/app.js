@@ -45,10 +45,6 @@ const styles = theme => ({
     connectorLine: {
         transition: theme.transitions.create('border-color'),
     },
-    labelContainer: {
-        display: "flex",
-        flexDirection: "column"
-    }
 });
 
 
@@ -67,15 +63,16 @@ class App extends React.Component {
             active_step: 0,
             pull_index: undefined,
             pull_total: 1,
+            is_valid: false,
             is_failed: false,
             failed_message: ""
         };
         this.steps = [
             'Choose an image',
-            'Validate image',
             'Pulling from Docker Hub',
             'Downloading to client'
         ];
+        this.cancel_source = undefined;
     }
 
     download() {
@@ -136,24 +133,40 @@ class App extends React.Component {
 
     onChange = (event) => {
         this.actual_name = event.target.value;
+        if(this.cancel_source) {
+            this.cancel_source.cancel("Another request sent");
+        }
+        this.cancel_source = axios.CancelToken.source();
+        axios.get(`/api/exists/${this.actual_name}`, {
+            cancelToken: this.cancel_source.token
+        }).then(
+            (data) => {
+                console.log("request sent");
+                console.log(data);
+                this.setState({
+                    ...this.state,
+                    is_valid: data.data.exists
+                });
+            }
+        ).catch((thrown) => {
+            if (axios.isCancel(thrown)) {
+                console.log('Request canceled', thrown.message);
+            }
+        });
     };
 
     validateImage = () => {
-        this.setState({
-            ...this.state,
-            active_step: 1
-        });
         axios.get(`/api/exists/${this.actual_name}`).then(
-            (resp) => {
+            (data) => {
                 console.log("request sent");
-                console.log("data exists: ", resp.data.exists);
-                if (resp.data.exists) {
+                console.log(data);
+                if (data.data.exists) {
                     this.startDownload();
                 } else {
                     this.setState({
                         ...this.state,
                         is_failed: true,
-                        failed_message: "Failed!"
+                        failed_message: "Validation failed!"
                     });
                 }
             }
@@ -163,7 +176,7 @@ class App extends React.Component {
     startDownload = () => {
         this.setState({
             ...this.state,
-            active_step: 2
+            active_step: 1
         });
         console.log(this.actual_name);
         axios.get(`/api/pull/${this.sid}/${this.actual_name}`).then(
@@ -177,7 +190,7 @@ class App extends React.Component {
     pullDone = () => {
         this.setState({
             ...this.state,
-            active_step: 4
+            active_step: 3
         })
     };
 
@@ -187,7 +200,8 @@ class App extends React.Component {
             active_step: 0,
             is_failed: false,
             pull_index: undefined,
-            failed_message: ""
+            failed_message: "",
+            is_valid: false
         })
     };
 
@@ -196,7 +210,7 @@ class App extends React.Component {
             case 0:
                 return (
                     <React.Fragment>
-                        <form onSubmit={this.validateImage}
+                        <form onSubmit={this.startDownload}
                               className="submit_form">
                             <TextField
                                 id="outlined-name"
@@ -210,13 +224,14 @@ class App extends React.Component {
                                 variant="contained"
                                 color="primary"
                                 type="submit"
+                                disabled={!this.state.is_valid}
                             >
                                 Download Now
                             </Button>
                         </form>
                     </React.Fragment>
                 );
-            case 2:
+            case 1:
                 return (<LinearProgress
                     variant={this.state.pull_index !== undefined ? "determinate" : undefined}
                     value={this.state.pull_index !== undefined ? this.state.pull_index * 100 / this.state.pull_total : undefined}/>);
@@ -224,7 +239,7 @@ class App extends React.Component {
                 return (
                     <Button variant="contained" color="primary"
                             onClick={this.downloadAnother}>
-                        {this.state.active_step === 1? "Retry" : "Download Another"}
+                        Download Another
                     </Button>
                 )
         }
@@ -242,7 +257,7 @@ class App extends React.Component {
     }
 
     render() {
-        const {classes} = this.props;
+
         return (
             <div className="container">
                 <div className="logo">
@@ -251,31 +266,9 @@ class App extends React.Component {
                 <Stepper activeStep={this.state.active_step} alternativeLabel
                          connector={this.connector}>
                     {this.steps.map((label, index) => {
-                        const stepProps = {};
-                        const labelProps = {};
-                        // if (isStepOptional(index)) {
-                        //     labelProps.optional = (
-                        //         <Typography variant="caption" color="error">
-                        //             Alert message
-                        //         </Typography>
-                        //     );
-                        // }
-                        if (this.state.active_step === index && this.state.is_failed) {
-                            labelProps.error = true;
-                            labelProps.optional = (
-                                <Typography variant="caption" color="error"
-                                            style={{margin: "auto"}}>
-                                    {this.state.failed_message}
-                                </Typography>);
-                        }
-                        // if (isStepSkipped(index)) {
-                        //     stepProps.completed = false;
-                        // }
                         return (
-                            <Step key={label} {...stepProps}>
-                                <StepLabel {...labelProps} classes={{
-                                    labelContainer: classes.labelContainer
-                                }}>{label}</StepLabel>
+                            <Step key={label}>
+                                <StepLabel>{label}</StepLabel>
                             </Step>
                         );
                     })}

@@ -115,6 +115,9 @@ class DockerImage(object):
 
         self.repository = '{}/{}'.format(self.repo, self.image_name)
 
+    def exists(self):
+        return requests.get(f"https://index.docker.io/v1/repositories/{self.repository}/tags/{self.tag}").status_code == 200
+
     @cached_property
     def manifest(self):
         resp = self.request(

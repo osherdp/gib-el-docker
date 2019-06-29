@@ -3,6 +3,7 @@ from gevent import monkey
 monkey.patch_all()
 
 import os
+import json
 
 import flask
 from flask_socketio import SocketIO, emit
@@ -43,6 +44,11 @@ def on_leave(data):
     room = data['room']
     leave_room(room)
     emit("event", ' has left the room.', room=room)
+
+
+@application.route("/api/exists/<room_id>/<repository>/<image>:<tag>")
+def image_exists(room_id, repository, image, tag):
+    return json.dumps({"exists": DockerImage(image=f"{image}:{tag}", repo=repository).exists()})
 
 
 @application.route("/api/pull/<room_id>/<repository>/<image>:<tag>")

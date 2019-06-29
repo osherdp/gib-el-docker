@@ -16,6 +16,8 @@ from cached_property import cached_property
 
 urllib3.disable_warnings()
 
+DOWNLOADS_DIR = "downloads"
+
 EMPTY_JSON = {"created": "1970-01-01T00:00:00Z",
               "container_config": {"Hostname": "", "Domainname": "", "User": "",
                                    "AttachStdin": False,
@@ -117,7 +119,9 @@ class DockerImage(object):
         self.repository = '{}/{}'.format(self.repo, self.image_name)
 
     def exists(self):
-        return requests.get(f"https://index.docker.io/v1/repositories/{self.repository}/tags/{self.tag}").status_code == int(http_client.OK)
+        return requests.get(
+            f"https://index.docker.io/v1/repositories/{self.repository}/tags/{self.tag}").status_code == int(
+            http_client.OK)
 
     @cached_property
     def manifest(self):
@@ -188,9 +192,9 @@ class DockerImage(object):
 
     @cached_property
     def imgdir(self):
-        if not os.path.exists("downloads"):
-            os.mkdir("downloads")
-        imgdir = 'downloads/tmp_{}_{}'.format(self.image_name, self.tag)
+        if not os.path.exists(DOWNLOADS_DIR):
+            os.mkdir(DOWNLOADS_DIR)
+        imgdir = f'{DOWNLOADS_DIR}/tmp_{self.image_name}_{self.tag}'
         if not os.path.exists(imgdir):
             os.mkdir(imgdir)
         return imgdir
@@ -203,8 +207,17 @@ class DockerImage(object):
         )
 
     @cached_property
+    def base_image_dir(self):
+        return f"tmp_{self.image_name}_{self.tag}"
+
+    @cached_property
     def tar_path(self):
-        return "downloads/" + self.repo + '_' + self.image_name + ":" + self.tag + '.tar.gz'
+        return \
+            f"{DOWNLOADS_DIR}/{self.repo}_{self.image_name}:{self.tag}.tar.gz"
+
+    @property
+    def files_to_tar(self):
+        return os.listdir(self.imgdir)
 
     def pull(self):
         print('Creating image structure in: ' + self.imgdir)
@@ -233,14 +246,18 @@ class DockerImage(object):
         print('Docker image pulled')
 
     def compress(self):
-        pipe = subprocess.Popen([f"tar", "-czvf", self.tar_path, self.imgdir],
-                                stdout=subprocess.PIPE)
+        pipe = subprocess.Popen(
+            [f"tar", "-C", self.imgdir, "-czvf", self.tar_path] +
+            self.files_to_tar,
+            stdout=subprocess.PIPE)
         while True:
             line = pipe.stdout.readline()
             if not line:
                 break
             # the real code does filtering here
             yield line.rstrip()
+
+        pipe.wait()
         shutil.rmtree(self.imgdir)
 
     def pull_layers(self):

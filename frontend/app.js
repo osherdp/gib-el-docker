@@ -2,11 +2,50 @@ import React from "react";
 import axios from "axios";
 import io from 'socket.io-client';
 import Cookies from 'universal-cookie';
-import {DownloadButton} from "./button";
 import TextField from "@material-ui/core/TextField";
+import Stepper from '@material-ui/core/Stepper';
+import Step from '@material-ui/core/Step';
+import StepLabel from '@material-ui/core/StepLabel';
+import LinearProgress from "@material-ui/core/LinearProgress";
 
 import logo from "./logo.png";
 import "./style.scss";
+import Button from "@material-ui/core/Button";
+import StepConnector from "@material-ui/core/StepConnector";
+import withStyles from "@material-ui/core/styles/withStyles";
+
+
+const styles = theme => ({
+    root: {
+        width: '90%',
+    },
+    button: {
+        marginRight: theme.spacing(1),
+    },
+    instructions: {
+        marginTop: theme.spacing(1),
+        marginBottom: theme.spacing(1),
+    },
+    connectorActive: {
+        '& $connectorLine': {
+            borderColor: theme.palette.secondary.main,
+        },
+    },
+    connectorCompleted: {
+        '& $connectorLine': {
+            borderColor: theme.palette.primary.main,
+        },
+    },
+    connectorDisabled: {
+        '& $connectorLine': {
+            borderColor: theme.palette.grey[100],
+        },
+    },
+    connectorLine: {
+        transition: theme.transitions.create('border-color'),
+    },
+});
+
 
 class App extends React.Component {
 
@@ -19,6 +58,14 @@ class App extends React.Component {
         this.image_name = React.createRef();
         this.actual_name = "";
         this.cookies = new Cookies();
+        this.state = {
+            active_step: 0,
+            pull_index: undefined,
+            pull_total: 1
+        };
+        this.steps = ['Choose an image',
+            'Pulling from Docker Hub',
+            'Downloading to client'];
     }
 
     componentDidMount() {
@@ -35,6 +82,25 @@ class App extends React.Component {
     bindSocket() {
         this.socket.on('connect', function () {
             console.log("connected!")
+        });
+        this.socket.on('pull_progress', (data) => {
+            this.setState({
+                ...this.state,
+                pull_index: data.index,
+                pull_total: data.total
+            });
+            console.log(data)
+        });
+        this.socket.off("pull_done");
+        this.socket.on("pull_done", (data) => {
+            console.log(data);
+            const path = data.tar_path;
+            this.pullDone();
+            const link = document.createElement('a');
+            link.href = `/api/download/${path}`;
+            link.setAttribute('download', path);
+            document.body.appendChild(link);
+            link.click();
         });
         this.socket.on('set_sid', (data) => {
             console.log(data);
@@ -70,30 +136,124 @@ class App extends React.Component {
         return this.sid;
     };
 
-    onChange = () => {
+    onChange = (event) => {
         this.actual_name = event.target.value;
     };
 
+    startDownload = () => {
+        console.log(this.actual_name);
+        axios.get(`/api/pull/${this.sid}/${this.actual_name}`).then(
+            (data) => {
+                console.log("request sent");
+                console.log(data);
+            }
+        );
+        this.setState({
+            ...this.state,
+            active_step: 1
+        })
+    };
+
+    pullDone = () => {
+        this.setState({
+            ...this.state,
+            active_step: 2
+        })
+    };
+
+    downloadAnother = () => {
+        this.setState({
+            ...this.state,
+            active_step: 0,
+            pull_index: undefined
+        })
+    };
+
+    renderComponent() {
+        switch (this.state.active_step) {
+            case 0:
+                return (
+                    <React.Fragment>
+                        <form onSubmit={this.startDownload}
+                              className="submit_form">
+                            <TextField
+                                id="outlined-name"
+                                label="Image Name"
+                                onChange={this.onChange}
+                                margin="normal"
+                                variant="outlined"
+                                className="input-field"
+                            />
+                            <Button
+                                variant="contained"
+                                color="primary"
+                                type="submit"
+                            >
+                                Download Now
+                            </Button>
+                        </form>
+                    </React.Fragment>
+                );
+            case 1:
+                return (<LinearProgress variant={this.state.pull_index  !== undefined ? "determinate": undefined}
+                                        value={this.state.pull_index !== undefined ? this.state.pull_index * 100 / this.state.pull_total : undefined}/>);
+            case 2:
+                return (
+                    <Button variant="contained" color="primary"
+                            onClick={this.downloadAnother}>
+                        Download Another
+                    </Button>
+                )
+        }
+    }
+
+    get connector() {
+        const { classes } = this.props;
+        return (<StepConnector classes={{
+            active: classes.connectorActive,
+            completed: classes.connectorCompleted,
+            disabled: classes.connectorDisabled,
+            line: classes.connectorLine,
+        }}
+        />);
+    }
+
     render() {
+
         return (
             <div className="container">
                 <div className="logo">
                     <img src={logo}/>
                 </div>
-                <TextField
-                    id="outlined-name"
-                    label="Image Name"
-                    onChange={this.onChange}
-                    margin="normal"
-                    variant="outlined"
-                    className="input-field"
-                />
-                <DownloadButton getValue={this.getImageValue}
-                                className="download-button"
-                                socket={this.socket} getSID={this.getSID}/>
+                <Stepper activeStep={this.state.active_step} alternativeLabel
+                         connector={this.connector}>
+                    {this.steps.map((label, index) => {
+                        const stepProps = {};
+                        const labelProps = {};
+                        // if (isStepOptional(index)) {
+                        //     labelProps.optional = (
+                        //         <Typography variant="caption" color="error">
+                        //             Alert message
+                        //         </Typography>
+                        //     );
+                        // }
+                        // if (isStepFailed(index)) {
+                        //     labelProps.error = true;
+                        // }
+                        // if (isStepSkipped(index)) {
+                        //     stepProps.completed = false;
+                        // }
+                        return (
+                            <Step key={label} {...stepProps}>
+                                <StepLabel {...labelProps}>{label}</StepLabel>
+                            </Step>
+                        );
+                    })}
+                </Stepper>
+                {this.renderComponent()}
             </div>
         );
     }
 }
 
-export default App;
+export default withStyles(styles)(App);

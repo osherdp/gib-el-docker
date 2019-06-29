@@ -198,13 +198,17 @@ class DockerImage(object):
             f"{self.digest}"
         )
 
+    @cached_property
+    def tar_path(self):
+        return "downloads/" + self.repo + '_' + self.image_name + ":" + self.tag + '.tar'
+
     def pull(self):
         print('Creating image structure in: ' + self.imgdir)
         with open('{}/{}.json'.format(self.imgdir, self.hash),
                   'wb') as blobs_file:
             blobs_file.write(self.blobs.content)
 
-        self.pull_layers()
+        yield from self.pull_layers()
         with open(self.imgdir + '/manifest.json', 'w') as manifest_file:
             manifest_file.write(json.dumps([
                 {
@@ -223,7 +227,7 @@ class DockerImage(object):
                 }))
 
         # Create image tar and clean tmp folder
-        docker_tar = "downloads/" + self.repo + '_' + self.image_name + ":" + self.tag + '.tar'
+        docker_tar = self.tar_path
         tar = tarfile.open(docker_tar, "w")
         tar.add(self.imgdir, arcname=os.path.sep)
         tar.close()
@@ -231,12 +235,11 @@ class DockerImage(object):
         shutil.rmtree(self.imgdir)
         print('Docker image pulled: ' + docker_tar)
 
-        return docker_tar
-
     def pull_layers(self):
         total = len(self.layers)
         for index, layer in enumerate(self.layers):
             print(f"Layer {index + 1}/{total} - ", end="")
+            yield index, total
             layer.write()
 
 

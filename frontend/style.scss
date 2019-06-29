@@ -14,22 +14,31 @@ html, body, #root {
     align-content: center;
     justify-content: center;
     flex-direction: column;
-    width: 400px;
+    width: 600px;
 
     .logo {
-      width: 100%;
+      width: 70%;
+      margin: auto;
 
       img {
         width: 100%;
       }
     }
 
-    .input_field {
-
-    }
-
-    .download-button {
+    .submit_form {
+      margin: auto;
       display: flex;
+      flex-direction: column;
+      width: 75%;
+
+      .input_field {
+
+      }
+
+      .download-button {
+        display: flex;
+      }
     }
+
   }
 }

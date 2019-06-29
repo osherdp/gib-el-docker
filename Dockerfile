@@ -6,5 +6,5 @@ ADD requirements.txt .
 RUN pip install -r requirements.txt
 ADD . .
 
-CMD gunicorn main:application -b 0.0.0.0:8000 -t 300 -w 1 --threads 3 --worker-class gevent
+CMD gunicorn main:application -b 0.0.0.0:$PORT -t 300 -w 1 --threads 3 --worker-class gevent --preload
 EXPOSE 8000

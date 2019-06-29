@@ -1,6 +1,7 @@
 import React from "react";
 import axios from "axios";
 import io from 'socket.io-client';
+import Cookies from 'universal-cookie';
 import {DownloadButton} from "./button";
 import TextField from "@material-ui/core/TextField";
 
@@ -17,6 +18,7 @@ class App extends React.Component {
         this.sid = undefined;
         this.image_name = React.createRef();
         this.actual_name = "";
+        this.cookies = new Cookies();
     }
 
     componentDidMount() {
@@ -36,7 +38,17 @@ class App extends React.Component {
         });
         this.socket.on('set_sid', (data) => {
             console.log(data);
-            this.sid = data.sid;
+            let room_id = data.sid;
+            const cookie_room = this.cookies.get('room_id');
+            console.log(cookie_room);
+            if (!cookie_room) {
+                this.cookies.set('room_id', data.sid);
+            } else {
+                room_id = cookie_room;
+            }
+
+            this.sid = room_id;
+            this.socket.emit("join", {"room": room_id});
         });
 
         this.socket.on('event', function (data) {

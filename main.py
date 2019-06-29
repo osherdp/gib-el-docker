@@ -6,6 +6,7 @@ import os
 
 import flask
 from flask_socketio import SocketIO, emit
+from flask_socketio import join_room, leave_room
 from flask import render_template, copy_current_request_context, request
 
 from docker import DockerImage
@@ -17,11 +18,10 @@ socketio = SocketIO(application, debug=True, async_mode="gevent")
 
 @socketio.on('connect')
 def test_message():
-    print("wow")
     emit('set_sid', {'sid': request.sid})
 
 
-@socketio.on('my event')
+@socketio.on('changed_sid')
 def test_message():
     emit('event', {'data': 'got it!'})
 
@@ -31,8 +31,22 @@ def index():
     return render_template("index.html")
 
 
-@application.route("/api/pull/<session_id>/<repository>/<image>:<tag>")
-def fetch(session_id, repository, image, tag):
+@socketio.on('join')
+def on_join(data):
+    room = data['room']
+    join_room(room)
+    emit("event", ' has entered the room.', room=room)
+
+
+@socketio.on('leave')
+def on_leave(data):
+    room = data['room']
+    leave_room(room)
+    emit("event", ' has left the room.', room=room)
+
+
+@application.route("/api/pull/<room_id>/<repository>/<image>:<tag>")
+def fetch(room_id, repository, image, tag):
     # file_path = "{repo}_{image}.tar".format(repo=repository, image=image)
     @copy_current_request_context
     def download_docker_image(repo, image):
@@ -41,7 +55,7 @@ def fetch(session_id, repository, image, tag):
         tar_path = docker_image.pull()
         print("pull done!")
         emit('pull_done', {"data": "pull_done!", "tar_path": tar_path},
-             namespace="/", room=session_id)
+             namespace="/", room=room_id)
 
     socketio.start_background_task(download_docker_image, repo=repository,
                                    image=f"{image}:{tag}")

@@ -46,8 +46,8 @@ def on_leave(data):
     emit("event", ' has left the room.', room=room)
 
 
-@application.route("/api/exists/<room_id>/<repository>/<image>:<tag>")
-def image_exists(room_id, repository, image, tag):
+@application.route("/api/exists/<repository>/<image>:<tag>")
+def image_exists(repository, image, tag):
     return json.dumps({"exists": DockerImage(image=f"{image}:{tag}", repo=repository).exists()})
 
 

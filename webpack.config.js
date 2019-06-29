@@ -1,7 +1,6 @@
 const path = require("path");
 
 module.exports = {
-    devtool: "source-map",
     entry: "./frontend/index.js",
     output: {
         library: 'gib_el_docker',

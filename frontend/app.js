@@ -13,6 +13,7 @@ import "./style.scss";
 import Button from "@material-ui/core/Button";
 import StepConnector from "@material-ui/core/StepConnector";
 import withStyles from "@material-ui/core/styles/withStyles";
+import Typography from "@material-ui/core/Typography";
 
 
 const styles = theme => ({
@@ -44,6 +45,10 @@ const styles = theme => ({
     connectorLine: {
         transition: theme.transitions.create('border-color'),
     },
+    labelContainer: {
+        display: "flex",
+        flexDirection: "column"
+    }
 });
 
 
@@ -61,15 +66,16 @@ class App extends React.Component {
         this.state = {
             active_step: 0,
             pull_index: undefined,
-            pull_total: 1
+            pull_total: 1,
+            is_failed: false,
+            failed_message: ""
         };
-        this.steps = ['Choose an image',
+        this.steps = [
+            'Choose an image',
+            'Validate image',
             'Pulling from Docker Hub',
-            'Downloading to client'];
-    }
-
-    componentDidMount() {
-
+            'Downloading to client'
+        ];
     }
 
     download() {
@@ -128,19 +134,37 @@ class App extends React.Component {
         });
     }
 
-    getImageValue = () => {
-        return this.actual_name;
-    };
-
-    getSID = () => {
-        return this.sid;
-    };
-
     onChange = (event) => {
         this.actual_name = event.target.value;
     };
 
+    validateImage = () => {
+        this.setState({
+            ...this.state,
+            active_step: 1
+        });
+        axios.get(`/api/exists/${this.actual_name}`).then(
+            (resp) => {
+                console.log("request sent");
+                console.log("data exists: ", resp.data.exists);
+                if (resp.data.exists) {
+                    this.startDownload();
+                } else {
+                    this.setState({
+                        ...this.state,
+                        is_failed: true,
+                        failed_message: "Failed!"
+                    });
+                }
+            }
+        );
+    };
+
     startDownload = () => {
+        this.setState({
+            ...this.state,
+            active_step: 2
+        });
         console.log(this.actual_name);
         axios.get(`/api/pull/${this.sid}/${this.actual_name}`).then(
             (data) => {
@@ -148,16 +172,12 @@ class App extends React.Component {
                 console.log(data);
             }
         );
-        this.setState({
-            ...this.state,
-            active_step: 1
-        })
     };
 
     pullDone = () => {
         this.setState({
             ...this.state,
-            active_step: 2
+            active_step: 4
         })
     };
 
@@ -165,7 +185,9 @@ class App extends React.Component {
         this.setState({
             ...this.state,
             active_step: 0,
-            pull_index: undefined
+            is_failed: false,
+            pull_index: undefined,
+            failed_message: ""
         })
     };
 
@@ -174,7 +196,7 @@ class App extends React.Component {
             case 0:
                 return (
                     <React.Fragment>
-                        <form onSubmit={this.startDownload}
+                        <form onSubmit={this.validateImage}
                               className="submit_form">
                             <TextField
                                 id="outlined-name"
@@ -194,21 +216,22 @@ class App extends React.Component {
                         </form>
                     </React.Fragment>
                 );
-            case 1:
-                return (<LinearProgress variant={this.state.pull_index  !== undefined ? "determinate": undefined}
-                                        value={this.state.pull_index !== undefined ? this.state.pull_index * 100 / this.state.pull_total : undefined}/>);
             case 2:
+                return (<LinearProgress
+                    variant={this.state.pull_index !== undefined ? "determinate" : undefined}
+                    value={this.state.pull_index !== undefined ? this.state.pull_index * 100 / this.state.pull_total : undefined}/>);
+            default:
                 return (
                     <Button variant="contained" color="primary"
                             onClick={this.downloadAnother}>
-                        Download Another
+                        {this.state.active_step === 1? "Retry" : "Download Another"}
                     </Button>
                 )
         }
     }
 
     get connector() {
-        const { classes } = this.props;
+        const {classes} = this.props;
         return (<StepConnector classes={{
             active: classes.connectorActive,
             completed: classes.connectorCompleted,
@@ -219,7 +242,7 @@ class App extends React.Component {
     }
 
     render() {
-
+        const {classes} = this.props;
         return (
             <div className="container">
                 <div className="logo">
@@ -237,15 +260,22 @@ class App extends React.Component {
                         //         </Typography>
                         //     );
                         // }
-                        // if (isStepFailed(index)) {
-                        //     labelProps.error = true;
-                        // }
+                        if (this.state.active_step === index && this.state.is_failed) {
+                            labelProps.error = true;
+                            labelProps.optional = (
+                                <Typography variant="caption" color="error"
+                                            style={{margin: "auto"}}>
+                                    {this.state.failed_message}
+                                </Typography>);
+                        }
                         // if (isStepSkipped(index)) {
                         //     stepProps.completed = false;
                         // }
                         return (
                             <Step key={label} {...stepProps}>
-                                <StepLabel {...labelProps}>{label}</StepLabel>
+                                <StepLabel {...labelProps} classes={{
+                                    labelContainer: classes.labelContainer
+                                }}>{label}</StepLabel>
                             </Step>
                         );
                     })}

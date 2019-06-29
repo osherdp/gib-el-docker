@@ -65,11 +65,13 @@ class App extends React.Component {
             pull_total: 1,
             is_valid: false,
             is_failed: false,
-            failed_message: ""
+            failed_message: "",
+            compress_log: ""
         };
         this.steps = [
             'Choose an image',
             'Pulling from Docker Hub',
+            'Compressing image',
             'Downloading to client'
         ];
         this.cancel_source = undefined;
@@ -85,6 +87,19 @@ class App extends React.Component {
     bindSocket() {
         this.socket.on('connect', function () {
             console.log("connected!")
+        });
+        this.socket.on('start_compress', () => {
+            this.setState({
+                ...this.state,
+                active_step: 2
+            })
+        });
+        this.socket.on('compress_progress', (data) => {
+            console.log(data);
+            this.setState({
+                ...this.state,
+               compress_log: data.line
+            });
         });
         this.socket.on('pull_progress', (data) => {
             this.setState({
@@ -190,7 +205,7 @@ class App extends React.Component {
     pullDone = () => {
         this.setState({
             ...this.state,
-            active_step: 3
+            active_step: 4
         })
     };
 
@@ -201,7 +216,8 @@ class App extends React.Component {
             is_failed: false,
             pull_index: undefined,
             failed_message: "",
-            is_valid: false
+            is_valid: false,
+            compress_log: ""
         })
     };
 
@@ -235,6 +251,14 @@ class App extends React.Component {
                 return (<LinearProgress
                     variant={this.state.pull_index !== undefined ? "determinate" : undefined}
                     value={this.state.pull_index !== undefined ? this.state.pull_index * 100 / this.state.pull_total : undefined}/>);
+            case 2:
+                return (
+                    <React.Fragment>
+                        <LinearProgress/>
+                        <Typography variant="caption">{this.state.compress_log}</Typography>
+                    </React.Fragment>
+                );
+
             default:
                 return (
                     <Button variant="contained" color="primary"

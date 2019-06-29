@@ -97,11 +97,15 @@ def fetch(room_id, path):
         print("downloading file!")
         docker_image = DockerImage(repo=repo, image=image)
         tar_path = docker_image.tar_path
-        total = 0
         for layer_index, total in docker_image.pull():
             emit('pull_progress', {"index": layer_index, "total": total},
                  namespace="/", room=room_id)
 
+        emit("start_compress", {}, namespace="/", room=room_id)
+        for line in docker_image.compress():
+            emit("compress_progress", {
+                "line": str(line)
+            }, namespace="/", room=room_id)
         print("pull done!")
         emit('pull_done', {"data": "pull_done!", "tar_path": tar_path},
              namespace="/", room=room_id)

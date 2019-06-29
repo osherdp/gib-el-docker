@@ -3,6 +3,7 @@ import hashlib
 import json
 import os
 import shutil
+import subprocess
 import sys
 import tarfile
 from io import BytesIO
@@ -203,7 +204,7 @@ class DockerImage(object):
 
     @cached_property
     def tar_path(self):
-        return "downloads/" + self.repo + '_' + self.image_name + ":" + self.tag + '.tar'
+        return "downloads/" + self.repo + '_' + self.image_name + ":" + self.tag + '.tar.gz'
 
     def pull(self):
         print('Creating image structure in: ' + self.imgdir)
@@ -229,14 +230,18 @@ class DockerImage(object):
                     }
                 }))
 
-        # Create image tar and clean tmp folder
-        docker_tar = self.tar_path
-        tar = tarfile.open(docker_tar, "w")
-        tar.add(self.imgdir, arcname=os.path.sep)
-        tar.close()
+        print('Docker image pulled')
 
+    def compress(self):
+        pipe = subprocess.Popen([f"tar", "-czvf", self.tar_path, self.imgdir],
+                                stdout=subprocess.PIPE)
+        while True:
+            line = pipe.stdout.readline()
+            if not line:
+                break
+            # the real code does filtering here
+            yield line.rstrip()
         shutil.rmtree(self.imgdir)
-        print('Docker image pulled: ' + docker_tar)
 
     def pull_layers(self):
         total = len(self.layers)

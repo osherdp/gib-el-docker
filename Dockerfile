@@ -1,7 +1,7 @@
 FROM python:3.7-alpine
 
 WORKDIR /app
-RUN apk add --no-cache --virtual .build-deps gcc musl-dev
+RUN apk add --no-cache --virtual .build-deps gcc musl-dev pv
 ADD requirements.txt .
 RUN pip install -r requirements.txt
 ADD . .

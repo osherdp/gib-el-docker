@@ -5,8 +5,6 @@ import os
 import shutil
 import subprocess
 import sys
-import tarfile
-from io import BytesIO
 
 import urllib3
 import requests
@@ -28,6 +26,9 @@ EMPTY_JSON = {"created": "1970-01-01T00:00:00Z",
                                    "Volumes": None, "WorkingDir": "",
                                    "Entrypoint": None, "OnBuild": None,
                                    "Labels": None}}
+
+
+CHUNK_SIZE = 1024 * 1024
 
 
 class URLRequestError(RuntimeError):
@@ -59,18 +60,20 @@ class ImageLayer(object):
 
         return layer_dir
 
-    @property
-    def blob(self):
+    def get_blob(self):
         print(f"Pulling blob: {self.hash}...", end="")
         sys.stdout.flush()
         download_blob_response = self.image.request(
             url=f"https://registry-1.docker.io/v2/{self.image.repository}/"
             f"blobs/{self.digest}",
-            error_msg=f'\rERROR: Cannot download layer {self.hash}'
+            error_msg=f'\rERROR: Cannot download layer {self.hash}',
+            stream=True
         )
         length = download_blob_response.headers['Content-Length']
+        for block in download_blob_response.iter_content(CHUNK_SIZE):
+            yield block, length
+
         print(f" done! [{length}B]")
-        return download_blob_response.content
 
     @cached_property
     def tar_path(self):
@@ -84,17 +87,12 @@ class ImageLayer(object):
         with open(f"{self.layer_dir}/VERSION", 'w') as version_file:
             version_file.write('1.0')
 
-        with open(self.tar_path, "wb") as layer_file:
-            mybuff = BytesIO(self.blob)
-            unzLayer = gzip.GzipFile(fileobj=mybuff)
-            while True:
-                chunk = unzLayer.read(1024)
-                if not chunk:
-                    break
-
-                layer_file.write(chunk)
-
-            unzLayer.close()
+        with gzip.open(self.tar_path, "wb") as layer_file:
+            sum = 0
+            for sub_layer, total in self.get_blob():
+                yield sum, total
+                layer_file.write(sub_layer)
+                sum += len(sub_layer)
 
         with open(f"{self.layer_dir}/json", 'w') as json_file:
             if self.image.last_layer.digest == self.digest:
@@ -183,8 +181,8 @@ class DockerImage(object):
             'Accept': 'application/vnd.docker.distribution.manifest.v2+json'
         }
 
-    def request(self, url, error_msg=None):
-        resp = requests.get(url, headers=self.auth_header)
+    def request(self, url, error_msg=None, stream=False):
+        resp = requests.get(url, headers=self.auth_header, stream=stream)
         if resp.status_code != int(http_client.OK):
             raise URLRequestError(error_msg, resp)
 
@@ -247,15 +245,16 @@ class DockerImage(object):
 
     def compress(self):
         pipe = subprocess.Popen(
-            [f"tar", "-C", self.imgdir, "-czvf", self.tar_path] +
+            [f"tar", "--record-size=10K", "--checkpoint", "-C", self.imgdir, "-czf", self.tar_path] +
             self.files_to_tar,
-            stdout=subprocess.PIPE)
+            stderr=subprocess.PIPE)
+
         while True:
-            line = pipe.stdout.readline()
+            line = pipe.stderr.readline()
             if not line:
                 break
             # the real code does filtering here
-            yield line.rstrip()
+            yield str(line.rstrip())
 
         pipe.wait()
         shutil.rmtree(self.imgdir)
@@ -264,10 +263,10 @@ class DockerImage(object):
         total = len(self.layers)
         for index, layer in enumerate(self.layers):
             print(f"Layer {index + 1}/{total} - ", end="")
-            yield index, total
-            layer.write()
+            for current_bytes, total_bytes in layer.write():
+                yield index, total, current_bytes, total_bytes
 
-        yield total, total
+        yield total, total, 1, 1
 
 
 if __name__ == '__main__':

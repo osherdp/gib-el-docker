@@ -63,6 +63,8 @@ class App extends React.Component {
             active_step: 0,
             pull_index: undefined,
             pull_total: 1,
+            pull_current_bytes: undefined,
+            pull_total_bytes: 1,
             is_valid: false,
             is_failed: false,
             failed_message: "",
@@ -98,14 +100,16 @@ class App extends React.Component {
             console.log(data);
             this.setState({
                 ...this.state,
-               compress_log: data.line
+                compress_log: data.line
             });
         });
         this.socket.on('pull_progress', (data) => {
             this.setState({
                 ...this.state,
                 pull_index: data.index,
-                pull_total: data.total
+                pull_total: data.total,
+                pull_current_bytes: data.current_bytes,
+                pull_total_bytes: data.total_bytes,
             });
             console.log(data)
         });
@@ -148,7 +152,7 @@ class App extends React.Component {
 
     onChange = (event) => {
         this.actual_name = event.target.value;
-        if(this.cancel_source) {
+        if (this.cancel_source) {
             this.cancel_source.cancel("Another request sent");
         }
         this.cancel_source = axios.CancelToken.source();
@@ -217,7 +221,9 @@ class App extends React.Component {
             pull_index: undefined,
             failed_message: "",
             is_valid: false,
-            compress_log: ""
+            compress_log: "",
+            pull_current_bytes: undefined,
+            pull_total_bytes: 1,
         })
     };
 
@@ -248,14 +254,38 @@ class App extends React.Component {
                     </React.Fragment>
                 );
             case 1:
-                return (<LinearProgress
-                    variant={this.state.pull_index !== undefined ? "determinate" : undefined}
-                    value={this.state.pull_index !== undefined ? this.state.pull_index * 100 / this.state.pull_total : undefined}/>);
+                return (
+                    <React.Fragment>
+
+                        <LinearProgress
+                            variant={this.state.pull_index !== undefined ? "determinate" : undefined}
+                            value={this.state.pull_index !== undefined ? this.state.pull_index * 100 / this.state.pull_total : undefined}/>
+                        <Typography component="h4" variant="subtitle1"
+                                    color="textSecondary"
+                                    style={{
+                                        margin: "auto"
+                                    }}>
+                            {this.state.pull_index === undefined ? "Loading..." :
+                                `Layer ${this.state.pull_index + 1} / ${this.state.pull_total}`}
+                        </Typography>
+                        <LinearProgress
+                            variant={this.state.pull_index !== undefined ? "determinate" : undefined}
+                            color="secondary"
+                            value={this.state.pull_current_bytes * 100 / this.state.pull_total_bytes}
+                        />
+                        {/*<Typography component="h5" variant="h5">*/}
+                        {/*    {this.state.pull_index !== undefined ? "" :*/}
+                        {/*      `${this.state.pull_current_bytes * 100 / this.state.pull_total_bytes} %`}*/}
+                        {/*</Typography>*/}
+                    </React.Fragment>
+                );
             case 2:
                 return (
                     <React.Fragment>
                         <LinearProgress/>
-                        <Typography variant="caption">{this.state.compress_log}</Typography>
+                        <Typography variant="caption" style={{
+                            margin: "auto"
+                        }}>{this.state.compress_log}</Typography>
                     </React.Fragment>
                 );
 

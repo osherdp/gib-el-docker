@@ -16,7 +16,11 @@ from flask_socketio import SocketIO, emit
 from flask_socketio import join_room, leave_room
 from flask import render_template, copy_current_request_context, request
 
-from docker import DockerImage
+from docker import DockerImage, DOWNLOADS_DIR
+
+
+MAX_FILES_IN_DOWNLOAD_DIR = 3
+
 
 application = flask.Flask(__name__)
 application.debug = True
@@ -130,7 +134,10 @@ def download_file(file_path):
         return flask.send_file(file_path, as_attachment=True)
 
     finally:
-        os.remove(file_path)
+        files_in_dir = os.listdir(DOWNLOADS_DIR)
+        if len(files_in_dir) > MAX_FILES_IN_DOWNLOAD_DIR:  # cleanup oldest files
+            oldest_file = min(files_in_dir, key=os.path.getctime)
+            os.remove(oldest_file)
 
 
 if __name__ == "__main__":
